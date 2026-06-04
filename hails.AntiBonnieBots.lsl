@@ -1,7 +1,9 @@
 integer MyChannel = 5050;
+integer hasEstatePerm = FALSE;
+list bannedBots;
 
 default
-{   
+{
     on_rez(integer start_param)
     {
         llResetScript();
@@ -12,60 +14,55 @@ default
             llResetScript();
     }
     state_entry()
-    {;
+    {
         llRequestPermissions(llGetOwner(), PERMISSION_SILENT_ESTATE_MANAGEMENT);
         llListen(MyChannel, "", llGetOwner(), "");
-        llInstantMessage(llGetOwner(), llGetScriptName() + " is now Online in the " + llGetRegionName() + " Region." );
+        llInstantMessage(llGetOwner(), llGetScriptName() + " is now Online in the " + llGetRegionName() + " Region.");
     }
     run_time_permissions(integer perm)
     {
-        if (perm & PERMISSION_SILENT_ESTATE_MANAGEMENT)
+        hasEstatePerm = (perm & PERMISSION_SILENT_ESTATE_MANAGEMENT) != 0;
+        if (hasEstatePerm)
         {
-            llInstantMessage(llGetOwner(), llGetScriptName() + " will suppress the default Estate Action notifications. \nSay /5050 bonnie.help for Commands");
-            llSetTimerEvent(1);
+            llInstantMessage(llGetOwner(), llGetScriptName() + " will suppress the default Estate Action notifications. \nSay /" + (string)MyChannel + " bonnie.help for Commands");
         }
         else
         {
-            llInstantMessage(llGetOwner(), llGetScriptName() + " will not suppress the default Estate Action notications. \nIf you find the default notifications annoying just reset/re-rez me to change this ♥ \nSay /5050 bonnie.help for Commands");
-            llSetTimerEvent(1);
+            llInstantMessage(llGetOwner(), llGetScriptName() + " will not suppress the default Estate Action notifications. \nIf you find the default notifications annoying just reset/re-rez me ♥ \nSay /" + (string)MyChannel + " bonnie.help for Commands");
         }
+        llSetTimerEvent(10.0);
     }
     listen(integer chan, string name, key id, string msg)
     {
-        key object_owner = llGetOwner();
-        key speakee = llGetOwnerKey(id);
         if (msg == "bonnie.reset")
         {
             llOwnerSay("Command acknowledged.");
-            llSleep(2.0);
             llResetScript();
         }
-         else if (msg == "bonnie.help")
+        else if (msg == "bonnie.help")
         {
-            llOwnerSay("Hails.AntiBonnie has the following commands:");
+            llOwnerSay(llGetScriptName() + " has the following commands:");
             llOwnerSay("bonnie.reset .............. Reset the Script");
             llOwnerSay("bonnie.help  ................ This help list");
         }
     }
     timer()
     {
-        llSensorRepeat("", "", AGENT_BY_USERNAME, 200.0, PI, 1.0);
-    }
-    sensor(integer num_detected)
-    {
+        list agents = llGetAgentList(AGENT_LIST_REGION, []);
+        integer count = llGetListLength(agents);
         integer i;
-        for (i = 0; i < num_detected; i++)
+        for (i = 0; i < count; i++)
         {
-            key user = llDetectedKey(i);
-            string name = llDetectedName(i);
-            string lower_name = llToLower(name);
-            integer action = ESTATE_ACCESS_BANNED_AGENT_ADD;
-            llOwnerSay(llGetScriptName() + " has detected " + name + " within the " + llGetRegionName() + " Region ");
-            if (llSubStringIndex(lower_name, "bonniebelle") != -1)
+            key user = llList2Key(agents, i);
+            string username = llGetUsername(user);
+            if (llSubStringIndex(username, "bonniebelle") != -1 &&
+                llListFindList(bannedBots, [user]) == -1)
             {
-                llManageEstateAccess(action, user);
-                llInstantMessage(user, "Hello " + name + ", \nyou have been Banned from the Simulator " + llGetRegionName() + " as you were detected to be apart of BonnieBots.com \nIf you believe this Ban has occurred in error, please Contact " + llKey2Name(llGetOwner()) + " via IM");
-                llInstantMessage(llGetOwner(), llGetScriptName() + " has Banned user: " + name + " \nFrom the " + llGetRegionName() + " Region. \nReason: Suspected BonnieBot");
+                bannedBots += [user];
+                if (hasEstatePerm)
+                    llManageEstateAccess(ESTATE_ACCESS_BANNED_AGENT_ADD, user);
+                llInstantMessage(user, "Hello " + username + ", \nyou have been Banned from the Simulator " + llGetRegionName() + " as you were detected to be a part of BonnieBots.com \nIf you believe this Ban has occurred in error, please contact the land owner via IM.");
+                llInstantMessage(llGetOwner(), llGetScriptName() + " has Banned user: " + username + " \nFrom the " + llGetRegionName() + " Region. \nReason: Suspected BonnieBot");
             }
         }
     }
